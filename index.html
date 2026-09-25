@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Vincula360 Retícula</title>
+  <!--
+    PUCHWORKS · Plantilla de herramienta
+    Layout: panel de controles (izq.) + escenario/lienzo (der.). En móvil: título → lienzo fijo → controles → barra inferior.
+    Para una herramienta nueva: cambia el título, reemplaza las secciones de .controls y la función render().
+    La carpeta fonts/ debe ir junto a este archivo.
+  -->
+  <style>
+    @font-face { font-family: 'Suisse Intl'; font-weight: 400; font-display: swap;
+      src: local('Suisse Intl Regular'), local('SuisseIntl-Regular'), url('fonts/SuisseIntl-Regular.woff2') format('woff2'); }
+    @font-face { font-family: 'Suisse Intl'; font-weight: 500; font-display: swap;
+      src: local('Suisse Intl Medium'), local('SuisseIntl-Medium'), url('fonts/SuisseIntl-Medium.woff2') format('woff2'); }
+    @font-face { font-family: 'Suisse Intl'; font-weight: 600; font-display: swap;
+      src: local('Suisse Intl SemiBold'), local('SuisseIntl-SemiBold'), url('fonts/SuisseIntl-SemiBold.woff2') format('woff2'); }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --panel: #FFFFFF;
+      --stage: #F1F1F1;
+      --stage-dark: #2B2B2B;
+      --tile: #F0F0F0;
+      --tile-hover: #E6E6E6;
+      --ink: #000000;
+      --muted: #707070;
+      --line: #D9D9D9;
+      --pill: 999px;
+      --checker: repeating-conic-gradient(#E4E4E4 0% 25%, #FFFFFF 0% 50%) 0 0 / 16px 16px;
+    }
+
+    html, body { height: 100%; }
+    body {
+      background: var(--panel);
+      color: var(--ink);
+      font-family: 'Suisse Intl', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; background: none; border: none; }
+
+    /* ── LAYOUT (desktop) ── */
+    .app {
+      height: 100vh; height: 100dvh;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      grid-template-rows: auto 1fr auto;
+    }
+    .brand   { grid-column: 1; grid-row: 1; }
+    .controls{ grid-column: 1; grid-row: 1 / 3; }
+    .actions { grid-column: 1; grid-row: 3; }
+    .stage   { grid-column: 2; grid-row: 1 / -1; }
+
+    /* Frosted title: the list scrolls underneath, blurred, fading out at the bottom edge */
+    .brand {
+      padding: 32px 30px 36px; margin-right: 6px;
+      position: relative; z-index: 2; align-self: start;
+      background: rgba(255,255,255,0.55);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent);
+      mask-image: linear-gradient(to bottom, #000 65%, transparent);
+    }
+    .brand h1 {
+      font-size: 26px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em;
+    }
+
+    .controls {
+      overflow-y: auto;
+      padding: 124px 30px 28px;   /* top = altura del título (2 líneas) */
+      display: flex; flex-direction: column; gap: 30px;
+      min-height: 0;
+    }
+    .controls::-webkit-scrollbar { width: 6px; }
+    .controls::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+
+    .section-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-label { font-size: 13px; font-weight: 600; }
+    .section-hint { font-size: 12px; color: var(--muted); }
+
+    /* ── PILLS ── */
+    .pill {
+      height: 42px; padding: 0 20px; border-radius: var(--pill);
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: 13px; font-weight: 500; white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+    }
+    .pill-dark { background: var(--ink); color: #fff; }
+    .pill-dark:hover { background: #2A2A2A; }
+    .pill-light { background: var(--tile); border: 1px solid transparent; }
+    .pill-light:hover { background: var(--tile-hover); }
+    .pill.active { border-color: var(--ink); }
+    .pill:disabled { opacity: 0.35; cursor: not-allowed; }
+    .pill svg { flex-shrink: 0; }
+
+    /* Segmented choice: two (or more) wide pills with label + value */
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .segmented .pill { justify-content: space-between; padding: 0 18px 0 20px; }
+    .segmented .pill span:last-child { font-weight: 400; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill-row .pill { height: 36px; padding: 0 14px; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .stack-top { margin-top: 14px; }
+
+    /* ── TILE GRID ── */
+    .tile-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .tile {
+      aspect-ratio: 1; position: relative;
+      background: var(--tile); border: 1px solid transparent; border-radius: 6px;
+      overflow: hidden; transition: background 0.15s, border-color 0.15s;
+    }
+    .tile:hover { background: var(--tile-hover); }
+    .tile.active { border-color: var(--ink); }
+    .tile .thumb {
+      position: absolute; left: 24%; top: 20%; width: 52%; height: 52%;
+      display: flex; align-items: center; justify-content: center; pointer-events: none;
+    }
+    .tile .thumb > * { max-width: 100%; max-height: 100%; }
+    .tile-label { position: absolute; left: 9px; bottom: 7px; font-size: 11px; font-weight: 500; }
+    .tile-badges { position: absolute; top: 7px; left: 7px; display: flex; gap: 3px; }
+    .badge {
+      background: var(--ink); color: #fff;
+      font-size: 9px; font-weight: 500; line-height: 1;
+      padding: 4px 7px; border-radius: var(--pill);
+    }
+    .tile-add {
+      aspect-ratio: 1; border: 1px dashed #BDBDBD; border-radius: 6px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      font-size: 11px; font-weight: 500; color: var(--muted);
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .tile-add:hover { border-color: var(--ink); color: var(--ink); }
+
+    /* ── SLIDER ── */
+    .control-row { display: flex; align-items: center; gap: 22px; }
+    .control-row label { font-size: 13px; font-weight: 500; }
+    .value { font-size: 12px; font-weight: 500; min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none; flex: 1; height: 20px;
+      background: transparent; cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--ink); }
+    input[type="range"]::-moz-range-track { height: 1px; background: var(--ink); }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px; margin-top: -8.5px;
+      border-radius: 50%; background: var(--ink); border: none;
+    }
+    input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: none; }
+
+    /* ── COLORS ── */
+    .color-group + .color-group { margin-top: 16px; }
+    .color-group-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .color-group-head span { font-size: 13px; font-weight: 500; }
+    .hex-field {
+      display: flex; align-items: center; gap: 6px;
+      height: 30px; padding: 0 4px 0 10px; border-radius: var(--pill); background: var(--tile);
+    }
+    .hex-field input[type="text"] {
+      width: 64px; border: none; background: none; outline: none;
+      font-size: 12px; text-transform: uppercase; font-variant-numeric: tabular-nums;
+    }
+    .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+    .swatch {
+      width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+      outline: 1px solid transparent; outline-offset: 2px;
+      transition: outline-color 0.15s, transform 0.1s;
+    }
+    .swatch:hover { transform: scale(1.1); }
+    .swatch.active { outline-color: var(--ink); }
+    .swatch.checker { background: var(--checker); background-size: 8px 8px; }
+    .swatch-picker {
+      position: relative; overflow: hidden;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--panel); color: var(--ink);
+    }
+    .swatch-picker:hover { transform: none; background: var(--ink); color: #fff; }
+    .swatch-picker input { position: absolute; inset: -6px; width: 40px; height: 40px; opacity: 0; cursor: pointer; border: none; }
+    .hex-field .swatch-picker { width: 22px; height: 22px; }
+
+    /* ── ACTIONS ── */
+    .actions {
+      padding: 16px 30px 24px;
+      display: flex; gap: 10px;
+      border-top: 1px solid #EFEFEF;
+      background: var(--panel);
+    }
+    .actions .pill { flex: 1; }
+    .actions .only-mobile { display: none; }
+
+    /* ── STAGE ── (wears the background color, so the artwork floats unframed) */
+    .stage {
+      background: var(--stage);
+      transition: background 0.2s;
+      position: relative; min-height: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #artwork { display: block; }
+    .stage-meta {
+      position: absolute; top: 24px; left: 28px;
+      font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+    }
+    .stage.dark .stage-meta { color: #8A8A8A; }
+
+    .credit {
+      display: inline-flex; align-items: center; gap: 14px;
+      height: 42px; padding: 0 20px; border-radius: var(--pill);
+      background: var(--panel); color: var(--ink);
+      font-size: 12px; font-weight: 500; text-decoration: none; white-space: nowrap;
+    }
+    .credit svg { height: 17px; width: auto; display: block; }
+    .stage .credit { position: absolute; right: 28px; bottom: 28px; }
+    .controls .credit { display: none; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 820px) {
+      body { overflow: auto; }
+      .app { display: flex; flex-direction: column; height: auto; min-height: 100dvh; }
+
+      .brand {
+        order: 1; padding: 20px 16px 16px; margin-right: 0; background: var(--panel);
+        -webkit-backdrop-filter: none; backdrop-filter: none;
+        -webkit-mask-image: none; mask-image: none;
+      }
+      .brand h1 { font-size: 22px; }
+      .brand h1 br { display: none; }
+
+      .stage { order: 2; position: sticky; top: 0; z-index: 5; height: min(100vw, 46vh); flex-shrink: 0; }
+      .stage .credit { display: none; }
+      .stage-meta { top: 12px; left: 16px; font-size: 11px; }
+
+      .controls {
+        order: 3; overflow: visible;
+        padding: 24px 16px calc(100px + env(safe-area-inset-bottom));
+        gap: 28px;
+      }
+      .controls .credit { display: inline-flex; align-self: flex-start; background: var(--tile); }
+
+      .desktop-only { display: none !important; }
+      .segmented { gap: 10px; }
+      .segmented .pill { padding: 0 16px; }
+      .tile-label { left: 7px; bottom: 6px; font-size: 10px; }
+      .swatch { width: 30px; height: 30px; }
+      .swatches { gap: 8px; }
+      .hex-field { height: 34px; }
+
+      .actions {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+        box-shadow: 0 -8px 24px rgba(0,0,0,0.06);
+      }
+      .actions .only-mobile { display: inline-flex; }
+      .actions .pill { height: 46px; padding: 0 14px; }
+      .actions .pill-light:not(.only-mobile) { flex: 0 0 auto; }
+    }
+
+    @media (hover: none) {
+      .tile:hover, .pill-light:hover { background: var(--tile); }
+      .swatch:hover { transform: none; }
+    }
+
+    /* ── RETÍCULA ── */
+    .segmented.four { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .segmented.four .pill { padding: 0 16px; font-size: 12px; min-width: 0; }
+    .segmented.four .pill span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .segmented.four .pill.active span:last-child { color: var(--ink); }
+    @media (max-width: 420px) { .segmented.four .pill { flex-direction: column; justify-content: center; align-items: flex-start; gap: 0; height: 48px; line-height: 1.25; } }
+    .segmented .pill { height: 42px; }
+    .op-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .op-grid .tile .thumb { left: 22%; top: 16%; width: 56%; height: 56%; }
+    .tile:disabled { opacity: 0.35; cursor: not-allowed; }
+    .tile-grid.presets .tile .thumb { left: 14%; top: 12%; width: 72%; height: 64%; }
+    .tile-grid.presets .tile .thumb svg { width: 100%; height: 100%; }
+    .row-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .row-actions .pill { flex: 1; height: 36px; font-size: 12px; }
+    .kbd-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 12px; }
+    .kbd-hint b, .paint-hint b { font-weight: 500; color: var(--ink); }
+
+    #artwork .cell { fill: transparent; cursor: pointer; }
+    #artwork .cell:hover { fill: rgba(0,0,0,0.05); }
+    #artwork .guides { stroke: #fff; stroke-width: 1; mix-blend-mode: difference; opacity: 0.45; pointer-events: none; }
+    #artwork .sel-bg { fill: none; stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+    #artwork .sel { fill: none; stroke: #000; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-dasharray: 6 5; pointer-events: none; }
+    .paint-grid { display: grid; grid-template-columns: repeat(auto-fill, 28px); gap: 8px; }
+    .paint-grid .swatch { width: 28px; height: 28px; }
+    .swatch.none { background: #fff linear-gradient(to top right, transparent calc(50% - 0.75px), #000 calc(50% - 0.75px), #000 calc(50% + 0.75px), transparent calc(50% + 0.75px)); }
+    .paint-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 12px; }
+    #artwork.brush .cell, #artwork.dots .cell.on { cursor: crosshair; }
+    .step { display: contents; }
+    .step.off { display: none; }
+    #steps .pill span:first-child { font-weight: 600; }
+    .tile-grid.shapes .tile .thumb { left: 20%; top: 14%; width: 60%; height: 60%; }
+    .tile-grid.shapes .tile .thumb svg { width: 100%; height: 100%; }
+    .sub-label { font-size: 13px; font-weight: 500; margin: 16px 0 8px; display: flex; justify-content: space-between; }
+    .sub-label span:last-child { font-size: 12px; font-weight: 400; color: var(--muted); }
+    .is-disabled { opacity: 0.35; pointer-events: none; }
+    @media (max-width: 820px) { .paint-grid { grid-template-columns: repeat(auto-fill, 32px); } .paint-grid .swatch { width: 32px; height: 32px; } }
+    .stage-hint {
+      position: absolute; left: 28px; bottom: 36px;
+      font-size: 12px; color: var(--muted);
+    }
+    .stage.dark .stage-hint { color: #8A8A8A; }
+    @media (max-width: 820px) { .stage-hint { display: none; } }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="brand">
+    <h1>Vincula360<br> Retícula generativa</h1>
+  </header>
+
+  <!-- STAGE -->
+  <main class="stage" id="stage">
+    <span class="stage-meta" id="stage-meta">1080 × 1350</span>
+    <svg id="artwork" width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg"></svg>
+    <span class="stage-hint desktop-only" id="stage-hint">Clic en una celda para seleccionarla</span>
+    <a class="credit" href="https://puchworks.com" target="_blank" rel="noopener">
+      Desarrollado por <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3133.63 453.85" fill="currentColor" aria-label="PUCHWORKS">
+      <path d="M138.54,208.12h-9.4v-86.5h8.14c26.34,0,47.65,11.91,47.65,41.37,0,25.7-13.8,45.13-46.4,45.13M659.45,177.01V7.52h-127.25v276.45c0,30.09-16.93,51.4-47.65,51.4s-48.26-21.31-48.26-55.17V7.52h-129.14v108.7C290.52,44.94,231.5,7.52,129.77,7.52H0v438.81h129.14v-136.66h5.64c104.12,0,156.86-49.17,172.36-108.46v95.29c0,102.18,70.85,156.72,177.41,156.72s174.9-56.42,174.9-161.1v-11.51c20.76,100.42,105.3,173.24,218.12,173.24,29.47,0,65.84-5.64,92.78-16.3v-144.18c-15.67,18.18-46.38,35.1-87.13,35.1-61.43,0-99.67-45.13-99.67-101.55s36.36-101.55,99.67-101.55c41.37,0,71.45,18.81,87.13,38.24V14.41c-26.32-9.4-61.43-14.41-92.14-14.41-99.19,0-195.97,58.45-218.76,177.01"/>
+      <path d="M2565.18,390.92l-56.39-134.53c24.58-14.13,48.92-43.22,56.39-80.83v215.36ZM2394.07,198.71h-9.39v-82.12h8.14c26.33,0,47.64,11.91,47.64,41.37,0,21.31-13.78,40.75-46.38,40.75M2034.07,328.47c-61.45,0-99.67-45.13-99.67-101.55s36.35-101.55,99.67-101.55,99.65,45.77,99.65,101.55-39.47,101.55-99.65,101.55M3079.27,201.03l-46.31-56.64c-11.06-12.29-12.48-20.23-12.48-25.77,0-12.47,9.85-15.09,18.12-15.09,12.9,0,31.02,6.11,53.87,18.18l15.14,7.98V12.84l-7.45-2.16C3075.65,3.6,3052.3,0,3030.75,0c-78.77,0-127.7,46.15-127.7,120.43,0,40.16,13.95,74.9,42.33,105.84l49.01,58.69c12.05,14.46,16.97,24.82,16.97,35.74,0,4.93,0,19.94-21.75,19.94-17.31,0-39.7-9.88-68.47-30.19l-16.27-11.48v103.93l-8.71-16.26-93.38-174.15,118.48-204.99h-134.15l-92.77,170.51V7.52h-129.14v114.28c-12.46-73.55-72.36-114.28-179.88-114.28h-129.77v157.88C2230.52,60.03,2142.29,0,2035.94,0,1953.03,0,1868.33,41.02,1828.6,123.67l23.69-116.15h-130.38l-22.57,211.25-50.16-211.25h-100.92l-45.13,211.25-24.44-211.25h-245.07v154.21h-107.83V7.52h-129.13v438.81h129.13v-159.22h107.83v159.22h129.13V99.22l71.44,347.73h116.59l48.28-231.31,50.14,231.31h113.47l42.84-210.02c2.65,122.3,101.19,216.91,229.82,216.91,98.69,0,193.95-61.02,220.21-166.47v158.95h129.15v-173.64h5.64l53.29,173.64h250.72v-163.61l4.38-9.4,87.75,173.01h153.54c19.02,4.73,39.25,7.52,58.67,7.52,83.25,0,134.96-49.62,134.96-129.51,0-51.87-20.91-85.77-54.36-123.31"/>
+    </svg>
+    </a>
+  </main>
+
+  <!-- CONTROLS -->
+  <section class="controls">
+
+    <div class="segmented" id="steps">
+      <button class="pill pill-light active" data-step="reticula" onclick="setStep('reticula')"><span>Retícula</span><span>Paso 1</span></button>
+      <button class="pill pill-light" data-step="formas" onclick="setStep('formas')"><span>Formas</span><span>Paso 2</span></button>
+    </div>
+
+    <div class="step" data-step="reticula">
+
+    <div>
+      <div class="section-head"><span class="section-label">Formato</span></div>
+      <div class="segmented four" id="sizes">
+        <button class="pill pill-light" data-w="1080" data-h="1080" onclick="setSize(this)"><span>Cuadrado</span><span>1080 × 1080</span></button>
+        <button class="pill pill-light active" data-w="1080" data-h="1350" onclick="setSize(this)"><span>Retrato</span><span>1080 × 1350</span></button>
+        <button class="pill pill-light" data-w="1080" data-h="1920" onclick="setSize(this)"><span>Vertical</span><span>1080 × 1920</span></button>
+        <button class="pill pill-light" data-w="1920" data-h="1080" onclick="setSize(this)"><span>Horizontal</span><span>1920 × 1080</span></button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-head">
+        <span class="section-label">Generar</span>
+        <span class="section-hint" id="complexity-hint">Complejidad 3</span>
+      </div>
+      <div class="control-row">
+        <label for="complexity">Niveles</label>
+        <input type="range" id="complexity" min="1" max="5" value="3" step="1" oninput="state.complexity = +this.value; syncUI()" />
+        <span class="value" id="complexity-value">3</span>
+      </div>
+      <button class="pill pill-dark stack-top desktop-only" style="width:100%" onclick="generate()">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M18 2l4 4-4 4M18 14l4 4-4 4"/></svg>
+        Generar retícula
+      </button>
+    </div>
+
+    <div>
+      <div class="section-head">
+        <span class="section-label">Dividir celda</span>
+        <span class="section-hint" id="sel-hint">Formato completo</span>
+      </div>
+      <div class="op-grid" id="ops"></div>
+      <div class="row-actions">
+        <button class="pill pill-light" id="btn-merge" onclick="merge()">Unir</button>
+        <button class="pill pill-light" id="btn-undo" onclick="undo()">Deshacer</button>
+        <button class="pill pill-light" onclick="reset()">Limpiar</button>
+      </div>
+      <p class="kbd-hint desktop-only">Atajos: <b>1</b> ½ columnas · <b>2</b> ⅓ columnas · <b>3</b> ½ filas · <b>4</b> ⅓ filas · <b>⌫</b> unir · <b>B</b> pincel · <b>⌘Z</b> deshacer</p>
+    </div>
+
+    <div>
+      <div class="section-head">
+        <span class="section-label">Pintar celda</span>
+        <span class="section-hint" id="paint-hint">Negro #161616</span>
+      </div>
+      <div class="paint-grid" id="paint-swatches"></div>
+      <div class="row-actions">
+        <button class="pill pill-light" id="btn-brush" onclick="toggleBrush()">Pincel</button>
+        <button class="pill pill-light" onclick="paintRandom()">Pintar al azar</button>
+        <button class="pill pill-light" onclick="clearPaint()">Quitar color</button>
+      </div>
+      <p class="paint-hint">Elige celdas (<b>⇧</b> clic para varias) y toca un color. Con <b>Pincel</b> activo, cada clic en el lienzo pinta con el color elegido.</p>
+    </div>
+
+    <div>
+      <div class="section-head">
+        <span class="section-label">Retículas base</span>
+        <span class="section-hint">Del manual</span>
+      </div>
+      <div class="tile-grid presets" id="presets"></div>
+    </div>
+
+    </div>
+
+    <!-- PASO 2: FORMAS — círculos del sistema (A = ancho del módulo) -->
+    <div class="step off" data-step="formas">
+
+    <div>
+      <div class="section-head">
+        <span class="section-label">Forma</span>
+        <span class="section-hint" id="shape-hint">Selecciona una celda</span>
+      </div>
+      <div class="tile-grid shapes" id="shape-types"></div>
+      <p class="paint-hint">A = ancho del módulo. Con un patrón elegido, haz clic dentro de la celda para <b>agregar o quitar círculos</b>.</p>
+    </div>
+
+    <div id="shape-controls">
+      <div class="section-head"><span class="section-label">Alineación</span></div>
+      <div class="pill-row" id="align">
+        <button class="pill pill-light" data-align="top" onclick="setAlign('top')">Arriba</button>
+        <button class="pill pill-light" data-align="center" onclick="setAlign('center')">Centro</button>
+        <button class="pill pill-light" data-align="bottom" onclick="setAlign('bottom')">Abajo</button>
+      </div>
+
+      <div class="sub-label"><span>Color de la forma</span><span id="shape-color-name"></span></div>
+      <div class="paint-grid" id="shape-swatches"></div>
+
+      <div class="sub-label"><span>Círculo interior</span><span id="inner-color-name"></span></div>
+      <div class="pill-row" id="inner"></div>
+      <div class="paint-grid stack-top" id="inner-swatches"></div>
+
+      <div class="row-actions">
+        <button class="pill pill-light" onclick="regenDots()">Otra variante</button>
+        <button class="pill pill-light" onclick="setShapeType(0)">Quitar forma</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-head"><span class="section-label">Composición</span></div>
+      <button class="pill pill-dark" style="width:100%" onclick="shapesRandom()">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M18 2l4 4-4 4M18 14l4 4-4 4"/></svg>
+        Formas al azar
+      </button>
+      <div class="row-actions">
+        <button class="pill pill-light" onclick="undo()">Deshacer</button>
+        <button class="pill pill-light" onclick="clearShapes()">Quitar todas</button>
+      </div>
+    </div>
+
+    </div>
+
+    <a class="credit" href="https://puchworks.com" target="_blank" rel="noopener">
+      Desarrollado por <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3133.63 453.85" fill="currentColor" aria-label="PUCHWORKS">
+      <path d="M138.54,208.12h-9.4v-86.5h8.14c26.34,0,47.65,11.91,47.65,41.37,0,25.7-13.8,45.13-46.4,45.13M659.45,177.01V7.52h-127.25v276.45c0,30.09-16.93,51.4-47.65,51.4s-48.26-21.31-48.26-55.17V7.52h-129.14v108.7C290.52,44.94,231.5,7.52,129.77,7.52H0v438.81h129.14v-136.66h5.64c104.12,0,156.86-49.17,172.36-108.46v95.29c0,102.18,70.85,156.72,177.41,156.72s174.9-56.42,174.9-161.1v-11.51c20.76,100.42,105.3,173.24,218.12,173.24,29.47,0,65.84-5.64,92.78-16.3v-144.18c-15.67,18.18-46.38,35.1-87.13,35.1-61.43,0-99.67-45.13-99.67-101.55s36.36-101.55,99.67-101.55c41.37,0,71.45,18.81,87.13,38.24V14.41c-26.32-9.4-61.43-14.41-92.14-14.41-99.19,0-195.97,58.45-218.76,177.01"/>
+      <path d="M2565.18,390.92l-56.39-134.53c24.58-14.13,48.92-43.22,56.39-80.83v215.36ZM2394.07,198.71h-9.39v-82.12h8.14c26.33,0,47.64,11.91,47.64,41.37,0,21.31-13.78,40.75-46.38,40.75M2034.07,328.47c-61.45,0-99.67-45.13-99.67-101.55s36.35-101.55,99.67-101.55,99.65,45.77,99.65,101.55-39.47,101.55-99.65,101.55M3079.27,201.03l-46.31-56.64c-11.06-12.29-12.48-20.23-12.48-25.77,0-12.47,9.85-15.09,18.12-15.09,12.9,0,31.02,6.11,53.87,18.18l15.14,7.98V12.84l-7.45-2.16C3075.65,3.6,3052.3,0,3030.75,0c-78.77,0-127.7,46.15-127.7,120.43,0,40.16,13.95,74.9,42.33,105.84l49.01,58.69c12.05,14.46,16.97,24.82,16.97,35.74,0,4.93,0,19.94-21.75,19.94-17.31,0-39.7-9.88-68.47-30.19l-16.27-11.48v103.93l-8.71-16.26-93.38-174.15,118.48-204.99h-134.15l-92.77,170.51V7.52h-129.14v114.28c-12.46-73.55-72.36-114.28-179.88-114.28h-129.77v157.88C2230.52,60.03,2142.29,0,2035.94,0,1953.03,0,1868.33,41.02,1828.6,123.67l23.69-116.15h-130.38l-22.57,211.25-50.16-211.25h-100.92l-45.13,211.25-24.44-211.25h-245.07v154.21h-107.83V7.52h-129.13v438.81h129.13v-159.22h107.83v159.22h129.13V99.22l71.44,347.73h116.59l48.28-231.31,50.14,231.31h113.47l42.84-210.02c2.65,122.3,101.19,216.91,229.82,216.91,98.69,0,193.95-61.02,220.21-166.47v158.95h129.15v-173.64h5.64l53.29,173.64h250.72v-163.61l4.38-9.4,87.75,173.01h153.54c19.02,4.73,39.25,7.52,58.67,7.52,83.25,0,134.96-49.62,134.96-129.51,0-51.87-20.91-85.77-54.36-123.31"/>
+    </svg>
+    </a>
+  </section>
+
+  <!-- ACTIONS -->
+  <footer class="actions">
+    <button class="pill pill-light only-mobile" onclick="state.step === 'formas' ? shapesRandom() : generate()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M18 2l4 4-4 4M18 14l4 4-4 4"/></svg>
+      Generar
+    </button>
+    <button class="pill pill-light" onclick="exportSVG()">SVG</button>
+    <button class="pill pill-dark" onclick="exportPNG()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Descargar PNG
+    </button>
+  </footer>
+
+</div>
+
+<script>
+  // ── Modelo ─────────────────────────────────────────────────────
+  // La retícula es un árbol: cada nodo es una celda hoja o se divide
+  // en 2 o 3 partes iguales, en columnas ('col') o en filas ('row').
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const MIN_CELL = 90;   // px en el formato final; no se divide por debajo de esto
+
+  // Paleta Vincula360
+  const PALETTE = [
+    { n: 'Negro', c: '#161616' }, { n: 'Gris', c: '#B3B3B3' }, { n: 'Gris 2', c: '#DBDBDB' }, { n: 'Gris 3', c: '#EEEEEE' }, { n: 'Blanco', c: '#FFFFFF' },
+    { n: 'Rosa', c: '#FF80E0' }, { n: 'Fucsia', c: '#E624B4' }, { n: 'Ocre', c: '#BAB108' }, { n: 'Dorado', c: '#6B6717' }, { n: 'Amarillo', c: '#EBEB00' }, { n: 'Amarillo claro', c: '#F2F2CA' },
+    { n: 'Café', c: '#CB5D1A' }, { n: 'Naranjo', c: '#FFA269' }, { n: 'Rojo', c: '#FF6243' }, { n: 'Ladrillo', c: '#98250E' }, { n: 'Morado', c: '#554FF1' }, { n: 'Lila', c: '#D1CFFC' },
+    { n: 'Celeste', c: '#00CEF4' }, { n: 'Celeste claro', c: '#A1D7E1' }, { n: 'Verde', c: '#00DC00' }, { n: 'Verde oscuro', c: '#08520E' },
+  ];
+  const colorName = c => c ? (PALETTE.find(p => p.c === c) || { n: c }).n : 'Sin color';
+
+
+  let uid = 0;
+  const L = (fill = null) => ({ id: ++uid, dir: null, fill, children: [] });
+  const C = (...ch) => ({ id: ++uid, dir: 'col', children: ch });
+  const R = (...ch) => ({ id: ++uid, dir: 'row', children: ch });
+
+  // Retículas del manual (Formatos Horizontales / Verticales)
+  const PRESETS = {
+    h: () => [
+      L(), C(L(), L()), C(L(), L(), L()),
+      C(C(L(), L()), C(L(), L())), C(R(L(), L()), R(L(), L())), C(L(), R(L(), L())),
+      R(C(C(L(), L()), C(L(), L())), C(C(L(), L()), C(L(), L()))), C(R(R(L(), L()), R(L(), L())), R(L(), L())), C(L(), L(), R(L(), L())),
+    ],
+    v: () => [
+      L(), R(L(), L()), C(R(L(), L()), R(L(), L())), R(R(R(L(), L()), L()), R(L(), R(L(), L()))),
+      C(R(R(L(), L()), R(L(), L())), R(R(L(), L()), R(L(), L()))),
+      R(C(L(), L()), L(), C(L(), L())), R(L(), C(L(), L())), R(L(), L(), L()), R(L(), R(L(), L())), R(R(L(), L()), R(L(), L())),
+    ],
+  };
+
+  const OPS = [
+    { dir: 'col', n: 2, label: '½ col.' },
+    { dir: 'col', n: 3, label: '⅓ col.' },
+    { dir: 'row', n: 2, label: '½ filas' },
+    { dir: 'row', n: 3, label: '⅓ filas' },
+  ];
+
+  // Formas: div = cuántos círculos caben en el ancho (A, /2, /4, /8, /16)
+  const SHAPES = [
+    { div: 0,  label: 'Ninguna' },
+    { div: 1,  label: 'Círculo A' },
+    { div: 2,  label: 'Patrón /2' },
+    { div: 4,  label: 'Patrón /4' },
+    { div: 8,  label: 'Patrón /8' },
+    { div: 16, label: 'Territorio' },
+  ];
+  const INNERS = [{ v: 0, t: 'Ninguno' }, { v: 6 / 8, t: '6/8' }, { v: 4 / 8, t: '4/8' }, { v: 2 / 8, t: '2/8' }];
+
+  const state = {
+    step: 'reticula',
+    tree: L(),
+    sel: null,          // id de la celda seleccionada (principal)
+    multi: [],          // otras celdas seleccionadas con ⇧
+    brush: '#161616',   // color activo
+    brushOn: false,     // Pincel: clic en el lienzo = pintar
+    complexity: 3,
+    bg: '#FFFFFF',      // el lienzo es siempre blanco
+    w: 1080, h: 1350,
+  };
+  const history = [];
+  let viewScale = 1;
+
+  // ── Árbol ──────────────────────────────────────────────────────
+  function find(node, id, parent = null) {
+    if (node.id === id) return { node, parent };
+    for (const ch of node.children) { const r = find(ch, id, node); if (r) return r; }
+    return null;
+  }
+
+  // Recorre el árbol con sus rectángulos: onLeaf(node, rect), onSplit(node, rect)
+  function walk(node, x, y, w, h, onLeaf, onSplit) {
+    if (!node.dir) return onLeaf && onLeaf(node, { x, y, w, h });
+    onSplit && onSplit(node, { x, y, w, h });
+    const n = node.children.length;
+    node.children.forEach((ch, i) => node.dir === 'col'
+      ? walk(ch, x + (w / n) * i, y, w / n, h, onLeaf, onSplit)
+      : walk(ch, x, y + (h / n) * i, w, h / n, onLeaf, onSplit));
+  }
+
+  function rectOf(id) {
+    let out = null;
+    walk(state.tree, 0, 0, state.w, state.h, (n, r) => { if (n.id === id) out = r; }, (n, r) => { if (n.id === id) out = r; });
+    return out;
+  }
+
+  function countLeaves(node) { return node.dir ? node.children.reduce((s, c) => s + countLeaves(c), 0) : 1; }
+  function clone(node) { return { id: ++uid, dir: node.dir, fill: node.fill ?? null, shape: node.shape ? structuredClone(node.shape) : null, children: node.children.map(clone) }; }
+  function leaves(node, out = []) { node.dir ? node.children.forEach(c => leaves(c, out)) : out.push(node); return out; }
+  // Celdas seleccionadas que siguen existiendo como hoja
+  function selected() {
+    return [...state.multi, state.sel].filter((id, i, a) => id != null && a.indexOf(id) === i)
+      .map(id => find(state.tree, id)?.node).filter(n => n && !n.dir);
+  }
+  function snapshot() { history.push(JSON.stringify({ tree: state.tree, sel: state.sel, multi: state.multi })); if (history.length > 80) history.shift(); }
+
+  // ── Dibujo ─────────────────────────────────────────────────────
+  // Dibuja la retícula (fondo + líneas) en un <svg>. ui = añade celdas clicables y selección.
+  function draw(svg, tree, W, H, opts) {
+    svg.replaceChildren();
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.appendChild(el('rect', { width: W, height: H, fill: opts.bg }));
+    const fills = el('g', { 'shape-rendering': 'crispEdges' });
+    // snap (PNG): cada borde se redondea una sola vez, así celdas vecinas comparten el mismo píxel
+    const px = v => opts.snap ? Math.round(v) : +v.toFixed(4);
+    walk(tree, 0, 0, W, H, (node, r) => {
+      if (!node.fill) return;
+      const x0 = px(r.x), y0 = px(r.y), x1 = px(r.x + r.w), y1 = px(r.y + r.h);
+      fills.appendChild(el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, fill: node.fill }));
+    });
+    if (fills.childNodes.length) svg.appendChild(fills);
+
+    // Formas: círculos sobre la sub-grilla de cada módulo, recortados a la celda
+    let defs = null, clipN = 0;
+    walk(tree, 0, 0, W, H, (node, r) => {
+      const s = node.shape; if (!s || !s.div) return;
+      const gr = gridOf(s, r);
+      const g = el('g', {});
+      s.dots.forEach(k => {
+        const [i, j] = k.split(',').map(Number);
+        if (i >= gr.rows || j >= gr.cols) return;
+        const { cx, cy } = gr.pos(i, j);
+        g.appendChild(el('circle', { cx: +cx.toFixed(3), cy: +cy.toFixed(3), r: +(gr.d / 2).toFixed(3), fill: s.color }));
+        if (s.inner) g.appendChild(el('circle', { cx: +cx.toFixed(3), cy: +cy.toFixed(3), r: +(gr.d / 2 * s.inner).toFixed(3), fill: s.innerColor }));
+      });
+      if (!g.childNodes.length) return;
+      if (gr.rows * gr.d > r.h + 0.01) {   // el círculo es más alto que la celda
+        if (!defs) { defs = el('defs', {}); svg.insertBefore(defs, svg.children[1] || null); }
+        const id = `clip${opts.ui ? 'u' : 'e'}${++clipN}`;
+        const cp = el('clipPath', { id }); cp.appendChild(el('rect', { x: r.x, y: r.y, width: r.w, height: r.h }));
+        defs.appendChild(cp); g.setAttribute('clip-path', `url(#${id})`);
+      }
+      svg.appendChild(g);
+    });
+    // Las líneas son solo una guía en pantalla: no se exportan
+    if (!opts.guides) return;
+    const sw = opts.stroke ?? 1;
+    const g = el('g', { class: 'guides', stroke: opts.line ?? '#000', 'stroke-width': sw, fill: 'none' });
+    walk(tree, 0, 0, W, H, null, (node, r) => {
+      const n = node.children.length;
+      for (let i = 1; i < n; i++) {
+        if (node.dir === 'col') { const x = r.x + (r.w / n) * i; g.appendChild(el('line', { x1: x, y1: r.y, x2: x, y2: r.y + r.h })); }
+        else { const y = r.y + (r.h / n) * i; g.appendChild(el('line', { x1: r.x, y1: y, x2: r.x + r.w, y2: y })); }
+      }
+    });
+    if (opts.border) g.appendChild(el('rect', { x: sw / 2, y: sw / 2, width: W - sw, height: H - sw }));
+    g.querySelectorAll('line, rect').forEach(n => n.setAttribute('vector-effect', 'non-scaling-stroke'));
+    svg.appendChild(g);
+
+    if (opts.ui) {
+      const ui = el('g', { class: 'ui' });
+      walk(tree, 0, 0, W, H, (node, r) => {
+        const c = el('rect', { class: 'cell' + (node.id === state.sel ? ' on' : ''), fill: 'transparent', x: r.x, y: r.y, width: r.w, height: r.h });
+        c.addEventListener('click', e => { e.stopPropagation(); onCell(node, e); });
+        ui.appendChild(c);
+      });
+      const i = 6 / viewScale;
+      selected().forEach(n => {
+        const r = rectOf(n.id), box = { x: r.x + i, y: r.y + i, width: Math.max(0, r.w - i * 2), height: Math.max(0, r.h - i * 2) };
+        ui.appendChild(el('rect', { class: 'sel-bg', ...box }));
+        ui.appendChild(el('rect', { class: 'sel', ...box }));
+      });
+      svg.appendChild(ui);
+    }
+  }
+
+  function render() {
+    const svg = document.getElementById('artwork');
+    svg.setAttribute('width', state.w); svg.setAttribute('height', state.h);
+    svg.classList.toggle('brush', state.brushOn);
+    // En pantalla la línea nunca baja de 1px real, aunque el lienzo esté reducido
+    draw(svg, state.tree, state.w, state.h, { bg: state.bg, guides: true, ui: true });
+    syncUI();
+  }
+
+  function el(tag, attrs) {
+    const n = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  function thumb(tree, W, H) {
+    const s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    const k = 100 / Math.max(W, H);
+    draw(s, tree, W * k, H * k, { bg: '#FFFFFF', guides: true, border: true });
+    return s;
+  }
+
+  // ── Edición ────────────────────────────────────────────────────
+  function select(id) { state.sel = id; state.multi = []; render(); }
+
+  function onCell(node, e) {
+    if (state.step === 'formas' && node.shape && node.shape.div > 1 && node.id === state.sel && !state.multi.length && !(e.shiftKey || e.metaKey)) {
+      return toggleDot(node, e);
+    }
+    if (state.brushOn) {
+      state.sel = node.id; state.multi = [];
+      if (node.fill !== state.brush) { snapshot(); node.fill = state.brush; }
+      return render();
+    }
+    if (e.shiftKey || e.metaKey) {
+      const all = selected().map(n => n.id);
+      state.multi = all.includes(node.id) ? all.filter(id => id !== node.id) : all;
+      state.sel = all.includes(node.id) ? (state.multi.pop() ?? null) : node.id;
+      return render();
+    }
+    select(node.id);
+  }
+
+  // Pinta las celdas seleccionadas (o fija el color del pincel si no hay ninguna)
+  function paint(color) {
+    state.brush = color;
+    const cells = selected();
+    if (cells.length && cells.some(n => n.fill !== color)) { snapshot(); cells.forEach(n => n.fill = color); }
+    render();
+  }
+
+  function toggleBrush() { state.brushOn = !state.brushOn; render(); }
+
+  // Al azar: sobre la selección si hay varias celdas; si no, sobre todo el formato
+  function paintRandom() {
+    const cells = selected().length > 1 ? selected() : leaves(state.tree);
+    snapshot();
+    let prev = null;
+    cells.forEach(n => {
+      let c; do { c = PALETTE[Math.floor(Math.random() * PALETTE.length)].c; } while (c === prev || c === state.bg);
+      n.fill = prev = c;
+    });
+    render();
+  }
+
+  function clearPaint() {
+    const cells = selected().length > 1 ? selected() : leaves(state.tree);
+    if (!cells.some(n => n.fill)) return;
+    snapshot(); cells.forEach(n => n.fill = null); render();
+  }
+
+  function canSplit(id, dir, n) {
+    const r = rectOf(id); if (!r) return false;
+    return (dir === 'col' ? r.w : r.h) / n >= MIN_CELL;
+  }
+
+  function split(dir, n) {
+    const id = state.sel ?? state.tree.id;
+    const hit = find(state.tree, id);
+    if (!hit || hit.node.dir || !canSplit(id, dir, n)) return;
+    snapshot();
+    hit.node.dir = dir;
+    hit.node.children = Array.from({ length: n }, () => L(hit.node.fill));
+    hit.node.fill = null; hit.node.shape = null;
+    state.sel = hit.node.children[0].id; state.multi = [];
+    render();
+  }
+
+  function merge() {
+    const hit = state.sel && find(state.tree, state.sel);
+    if (!hit || !hit.parent) return;
+    snapshot();
+    hit.parent.fill = hit.node.fill ?? null;
+    hit.parent.shape = hit.node.shape ?? null;
+    hit.parent.dir = null; hit.parent.children = [];
+    state.sel = hit.parent.id; state.multi = [];
+    render();
+  }
+
+  function undo() {
+    const prev = history.pop(); if (!prev) return;
+    const s = JSON.parse(prev);
+    state.tree = s.tree; state.sel = s.sel; state.multi = s.multi || [];
+    render();
+  }
+
+  function reset() { snapshot(); state.tree = L(); state.sel = state.tree.id; state.multi = []; render(); }
+
+  function applyPreset(tree) { snapshot(); state.tree = clone(tree); state.sel = null; state.multi = []; render(); }
+
+  // Divide siempre en 2 o 3, recursivamente, a lo largo o a lo ancho
+  function generate() {
+    const maxDepth = state.complexity;
+    const grow = (w, h, depth) => {
+      const node = L();
+      if (depth >= maxDepth || (depth > 0 && Math.random() < 0.18 + depth * 0.12)) return node;
+      const long = w >= h ? 'col' : 'row';
+      let dir = Math.random() < 0.62 ? long : (long === 'col' ? 'row' : 'col');
+      let n = Math.random() < 0.6 ? 2 : 3;
+      const fits = (d, k) => (d === 'col' ? w : h) / k >= MIN_CELL;
+      if (!fits(dir, n)) n = 2;
+      if (!fits(dir, n)) { dir = dir === 'col' ? 'row' : 'col'; n = 2; }
+      if (!fits(dir, n)) return node;
+      node.dir = dir;
+      node.children = Array.from({ length: n }, () => dir === 'col' ? grow(w / n, h, depth + 1) : grow(w, h / n, depth + 1));
+      return node;
+    };
+    snapshot();
+    let t; do { t = grow(state.w, state.h, 0); } while (countLeaves(t) < 2 + state.complexity);
+    state.tree = t; state.sel = null; state.multi = [];
+    render();
+  }
+
+  // ── Formas ─────────────────────────────────────────────────────
+  // Sub-grilla del módulo: columnas = div, diámetro = ancho / div.
+  // Las filas se cuentan desde el borde de alineación (fila 0 = pegada al borde).
+  function gridOf(s, r) {
+    const cols = s.div, d = r.w / cols;
+    const rows = Math.max(1, Math.floor(r.h / d + 1e-6));
+    const oy = s.align === 'center' ? r.y + (r.h - rows * d) / 2 : r.y;
+    const pos = (i, j) => ({
+      cx: r.x + (j + 0.5) * d,
+      cy: s.align === 'bottom' ? r.y + r.h - (i + 0.5) * d : oy + (i + 0.5) * d,
+    });
+    return { cols, rows, d, pos, oy };
+  }
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  // Crece un grupo de círculos vecinos desde una semilla; compact > 0 lo hace más macizo
+  function growCluster(set, cols, rows, target, compact) {
+    const has = (i, j) => set.has(`${i},${j}`);
+    let guard = 0;
+    while (set.size < target && guard++ < 5000) {
+      const front = [];
+      set.forEach(k => {
+        const [i, j] = k.split(',').map(Number);
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => {
+          const ni = i + a, nj = j + b;
+          if (ni < 0 || nj < 0 || ni >= rows || nj >= cols || has(ni, nj)) return;
+          const n = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([x, y]) => has(ni + x, nj + y)).length;
+          front.push({ k: `${ni},${nj}`, w: Math.pow(n, compact) });
+        });
+      });
+      if (!front.length) break;
+      let t = Math.random() * front.reduce((s, f) => s + f.w, 0);
+      const f = front.find(f => (t -= f.w) <= 0) || front[front.length - 1];
+      set.add(f.k);
+    }
+    return set;
+  }
+
+  // Territorio: contorno orgánico (radio con armónicos + ruido) y algunos círculos sueltos en el borde
+  function territory(cols, rows) {
+    const set = new Set();
+    // más chico que el módulo, para que quede espacio y se note la alineación
+    const R = Math.min(cols, rows) / 2 * rnd(0.6, 0.78);
+    const cx = rnd(R + 0.5, cols - R - 0.5), cy = rows / 2;
+    const h = [2, 3, 5, 7].map(k => ({ k, a: rnd(0.04, 0.2) / (k / 2), p: rnd(0, Math.PI * 2) }));
+    const bay = { a: rnd(0, Math.PI * 2), r: R * rnd(0.25, 0.4) };
+    const edge = th => R * (1 + h.reduce((s, x) => s + x.a * Math.sin(x.k * th + x.p), 0));
+    for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+      const x = j + 0.5 - cx, y = i + 0.5 - cy, dist = Math.hypot(x, y), th = Math.atan2(y, x);
+      const e = edge(th);
+      const bx = cx + Math.cos(bay.a) * R * 0.95, by = cy + Math.sin(bay.a) * R * 0.95;
+      if (Math.hypot(j + 0.5 - bx, i + 0.5 - by) < bay.r) continue;          // bahía
+      if (dist < e + rnd(-0.5, 0.5)) set.add(`${i},${j}`);
+      else if (dist < e + 2 && Math.random() < 0.1) set.add(`${i},${j}`);     // islas
+    }
+    return set;
+  }
+
+  function genDots(div, cols, rows, align) {
+    const edgeRow = align === 'center' ? Math.floor((rows - 1) / 2) : 0;
+    const total = cols * rows;
+    if (div === 1) return [`${edgeRow},0`];
+    if (div === 16) return place([...territory(cols, rows)], rows, 'top', align);
+    const seedCol = pick([0, cols - 1, Math.floor(Math.random() * cols)]);
+    const set = new Set([`${edgeRow},${seedCol}`]);
+    if (div === 2) growCluster(set, cols, rows, Math.min(total, Math.round(rnd(2, 3.4))), 0);
+    if (div === 4) {
+      growCluster(set, cols, rows, Math.min(total, Math.round(rnd(3, 6.4))), 0.5);
+      // a veces un círculo suelto en la esquina opuesta, como en el manual
+      if (Math.random() < 0.45 && rows > 2) {
+        const far = `${rows - 1},${seedCol < cols / 2 ? cols - 1 : 0}`;
+        if (!set.has(far)) set.add(far);
+      }
+    }
+    if (div === 8) {
+      if (Math.random() < 0.5) set.add(`${edgeRow},${Math.floor(Math.random() * cols)}`);
+      growCluster(set, cols, rows, Math.round(total * rnd(0.28, 0.5)), 1.6);
+    }
+    return [...set];
+  }
+
+  function contrastColor(fill, avoid) {
+    const base = fill || state.bg;
+    const pool = PALETTE.map(p => p.c).filter(c => c !== base && c !== avoid && !(base === '#FFFFFF' && c === '#EEEEEE'));
+    return pick(pool);
+  }
+
+  function newShape(node, div, prev) {
+    const r = rectOf(node.id);
+    const align = prev?.align ?? pick(['top', 'bottom']);
+    const color = prev?.color && prev.color !== node.fill ? prev.color : contrastColor(node.fill);
+    const s = { div, align, color, inner: prev?.inner ?? 0, innerColor: prev?.innerColor ?? contrastColor(color, node.fill) };
+    const gr = gridOf(s, r);
+    s.dots = genDots(div, gr.cols, gr.rows, align);
+    return s;
+  }
+
+  function editShapes(fn) {
+    const cells = selected(); if (!cells.length) return;
+    snapshot(); cells.forEach(fn); render();
+  }
+
+  function setShapeType(div) {
+    editShapes(n => { n.shape = div ? newShape(n, div, n.shape) : null; });
+  }
+  function regenDots() {
+    editShapes(n => { if (n.shape) { const gr = gridOf(n.shape, rectOf(n.id)); n.shape.dots = genDots(n.shape.div, gr.cols, gr.rows, n.shape.align); } });
+  }
+  // Reubica los círculos para que el conjunto toque el borde elegido (o quede centrado),
+  // conservando su forma. Las filas se guardan contadas desde el borde de alineación.
+  function place(dots, rows, from, to) {
+    if (!dots.length) return dots;
+    const vis = dots.map(k => { const [i, j] = k.split(',').map(Number); return [from === 'bottom' ? rows - 1 - i : i, j]; });
+    const min = Math.min(...vis.map(v => v[0])), max = Math.max(...vis.map(v => v[0]));
+    const shift = to === 'top' ? -min : to === 'bottom' ? rows - 1 - max : Math.floor((rows - (max - min + 1)) / 2) - min;
+    return vis.map(([v, j]) => { v += shift; return `${to === 'bottom' ? rows - 1 - v : v},${j}`; })
+      .filter(k => { const i = +k.split(',')[0]; return i >= 0 && i < rows; });
+  }
+
+  function setAlign(a) {
+    editShapes(n => {
+      if (!n.shape) return;
+      const rows = gridOf(n.shape, rectOf(n.id)).rows;
+      n.shape.dots = place(n.shape.dots, rows, n.shape.align, a);
+      n.shape.align = a;
+    });
+  }
+  function setShapeColor(c) { editShapes(n => { if (n.shape) n.shape.color = c; }); }
+  function setInner(v) { editShapes(n => { if (n.shape) n.shape.inner = v; }); }
+  function setInnerColor(c) { editShapes(n => { if (n.shape) { n.shape.innerColor = c; if (!n.shape.inner) n.shape.inner = 4 / 8; } }); }
+
+  function toggleDot(node, e) {
+    const svg = document.getElementById('artwork');
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const { x, y } = pt.matrixTransform(svg.getScreenCTM().inverse());
+    const r = rectOf(node.id), s = node.shape, gr = gridOf(s, r);
+    const j = Math.floor((x - r.x) / gr.d);
+    const i = Math.floor(s.align === 'bottom' ? (r.y + r.h - y) / gr.d : (y - gr.oy) / gr.d);
+    if (i < 0 || j < 0 || i >= gr.rows || j >= gr.cols) return;
+    snapshot();
+    const k = `${i},${j}`;
+    s.dots = s.dots.includes(k) ? s.dots.filter(d => d !== k) : [...s.dots, k];
+    render();
+  }
+
+  // Composición al azar: formas en ~60% de los módulos, el tamaño según el módulo
+  function shapesRandom() {
+    snapshot();
+    leaves(state.tree).forEach(n => {
+      n.shape = null;
+      if (Math.random() > 0.6) return;
+      const r = rectOf(n.id);
+      const opts = [];
+      [[1, 3], [2, 2], [4, 2], [8, 2], [16, r.w >= 300 && r.h >= 300 ? 2 : 0]].forEach(([div, w]) => {
+        // al azar, solo tamaños que caben en el alto del módulo (a mano sí se permite recortar)
+        if (r.w / div >= 14 && r.w / div <= r.h + 0.01) for (let i = 0; i < w; i++) opts.push(div);
+      });
+      if (!opts.length) return;
+      const div = pick(opts);
+      n.shape = newShape(n, div, null);
+      if (div <= 2 && Math.random() < 0.55) n.shape.inner = pick([6 / 8, 4 / 8, 2 / 8]);
+      if (div === 4 && Math.random() < 0.25) n.shape.inner = pick([4 / 8, 2 / 8]);
+    });
+    state.sel = null; state.multi = [];
+    render();
+  }
+
+  function clearShapes() {
+    const cells = selected().length > 1 ? selected() : leaves(state.tree);
+    if (!cells.some(n => n.shape)) return;
+    snapshot(); cells.forEach(n => n.shape = null); render();
+  }
+
+  function setStep(step) {
+    state.step = step; state.brushOn = false;
+    document.querySelectorAll('.step').forEach(s => s.classList.toggle('off', s.dataset.step !== step));
+    document.querySelectorAll('#steps .pill').forEach(b => b.classList.toggle('active', b.dataset.step === step));
+    render();
+  }
+
+  // ── UI ─────────────────────────────────────────────────────────
+  function buildShapeUI() {
+    const grid = document.getElementById('shape-types');
+    const demo = {
+      0: '', 1: [[0, 0]], 2: [[0, 0], [1, 0], [1, 1]], 4: [[0, 0], [3, 3], [2, 3], [3, 2], [1, 3]],
+      8: [[7,1],[7,2],[7,3],[7,4],[6,1],[6,2],[6,3],[6,4],[6,5],[5,2],[5,3],[5,4],[5,5],[4,3],[4,4],[4,5],[4,6],[3,4],[3,5],[2,5],[5,0],[6,0]],
+    };
+    SHAPES.forEach(sh => {
+      const t = document.createElement('button');
+      t.className = 'tile'; t.dataset.div = sh.div;
+      let inner = '';
+      if (sh.div === 16) {
+        const st = territory(16, 16);
+        st.forEach(k => { const [i, j] = k.split(',').map(Number); inner += `<circle cx="${j * 6.25 + 3.125}" cy="${i * 6.25 + 3.125}" r="2.9"/>`; });
+      } else if (sh.div) {
+        const d = 100 / sh.div;
+        demo[sh.div].forEach(([i, j]) => inner += `<circle cx="${j * d + d / 2}" cy="${i * d + d / 2}" r="${d / 2}"/>`);
+      } else {
+        inner = '<path d="M20 80 L80 20" stroke="#000" stroke-width="2" vector-effect="non-scaling-stroke"/>';
+      }
+      t.innerHTML = `<span class="thumb"><svg viewBox="0 0 100 100" fill="#000">${inner}</svg></span><span class="tile-label">${sh.label}</span>`;
+      t.onclick = () => setShapeType(sh.div);
+      grid.appendChild(t);
+    });
+
+    const mk = (boxId, list, fn) => {
+      const box = document.getElementById(boxId);
+      list.forEach(p => {
+        const s = document.createElement('button');
+        s.className = 'swatch'; s.title = `${p.n} ${p.c}`; s.dataset.color = p.c; s.style.background = p.c;
+        s.onclick = () => fn(p.c);
+        box.appendChild(s);
+      });
+    };
+    mk('shape-swatches', PALETTE, setShapeColor);
+    mk('inner-swatches', PALETTE, setInnerColor);
+    const inn = document.getElementById('inner');
+    INNERS.forEach(o => {
+      const b = document.createElement('button');
+      b.className = 'pill pill-light'; b.textContent = o.t; b.dataset.v = o.v;
+      b.onclick = () => setInner(o.v);
+      inn.appendChild(b);
+    });
+  }
+
+  function syncShapeUI() {
+    const cells = selected();
+    const s = cells[0]?.shape;
+    const same = (f) => cells.length && cells.every(n => n.shape && f(n.shape) === f(s));
+    document.querySelectorAll('#shape-types .tile').forEach(t => t.classList.toggle('active',
+      cells.length > 0 && cells.every(n => (n.shape?.div ?? 0) === +t.dataset.div)));
+    document.getElementById('shape-types').classList.toggle('is-disabled', !cells.length);
+    document.getElementById('shape-controls').classList.toggle('is-disabled', !cells.some(n => n.shape));
+    const r = cells.length === 1 && rectOf(cells[0].id);
+    document.getElementById('shape-hint').textContent = !cells.length ? 'Selecciona una celda'
+      : cells.length > 1 ? `${cells.length} celdas`
+      : s ? `A = ${Math.round(r.w)} px · círculo ${+(r.w / s.div).toFixed(1)} px` : `Módulo ${Math.round(r.w)} × ${Math.round(r.h)} · A = ${Math.round(r.w)}`;
+    document.querySelectorAll('#align .pill').forEach(b => b.classList.toggle('active', !!s && same(x => x.align) && s.align === b.dataset.align));
+    document.querySelectorAll('#inner .pill').forEach(b => b.classList.toggle('active', !!s && same(x => x.inner) && s.inner === +b.dataset.v));
+    document.querySelectorAll('#shape-swatches .swatch').forEach(b => b.classList.toggle('active', !!s && same(x => x.color) && s.color === b.dataset.color));
+    document.querySelectorAll('#inner-swatches .swatch').forEach(b => b.classList.toggle('active', !!s && s.inner > 0 && same(x => x.innerColor) && s.innerColor === b.dataset.color));
+    document.getElementById('inner-swatches').classList.toggle('is-disabled', !(s && s.inner));
+    document.getElementById('shape-color-name').textContent = s && same(x => x.color) ? `${colorName(s.color)} ${s.color}` : '';
+    document.getElementById('inner-color-name').textContent = s && s.inner && same(x => x.innerColor) ? `${colorName(s.innerColor)} ${s.innerColor}` : '';
+    const dotsMode = state.step === 'formas' && cells.length === 1 && s && s.div > 1;
+    document.getElementById('artwork').classList.toggle('dots', !!dotsMode);
+    document.getElementById('stage-hint').textContent = state.step === 'formas'
+      ? (dotsMode ? 'Clic dentro de la celda para agregar o quitar círculos' : 'Clic en una celda para darle una forma')
+      : 'Clic en una celda para seleccionarla';
+  }
+
+  function buildOps() {
+    const grid = document.getElementById('ops');
+    OPS.forEach((op, i) => {
+      const t = document.createElement('button');
+      t.className = 'tile'; t.dataset.i = i;
+      t.title = `${op.label} (${i + 1})`;
+      const demo = { id: -1, dir: op.dir, children: Array.from({ length: op.n }, () => ({ id: -1, dir: null, children: [] })) };
+      const th = document.createElement('span'); th.className = 'thumb';
+      th.appendChild(thumb(demo, 100, 100));
+      t.appendChild(th);
+      t.insertAdjacentHTML('beforeend', `<span class="tile-label">${op.label}</span>`);
+      t.onclick = () => split(op.dir, op.n);
+      grid.appendChild(t);
+    });
+  }
+
+  function buildPresets() {
+    const grid = document.getElementById('presets');
+    grid.replaceChildren();
+    const { w, h } = state;
+    const list = w > h ? PRESETS.h() : h > w ? PRESETS.v() : [...PRESETS.v(), ...PRESETS.h().slice(3)];
+    list.forEach(tree => {
+      const t = document.createElement('button');
+      t.className = 'tile';
+      const th = document.createElement('span'); th.className = 'thumb';
+      th.appendChild(thumb(tree, w, h));
+      t.appendChild(th);
+      t.onclick = () => applyPreset(tree);
+      grid.appendChild(t);
+    });
+  }
+
+  function buildSwatches() {
+    const pt = document.getElementById('paint-swatches');
+    [...PALETTE, { n: 'Sin color', c: null }].forEach(p => {
+      const s = document.createElement('button');
+      s.className = 'swatch' + (p.c ? '' : ' none'); s.title = p.c ? `${p.n} ${p.c}` : p.n; s.dataset.color = p.c ?? '';
+      if (p.c) s.style.background = p.c;
+      s.onclick = () => paint(p.c);
+      pt.appendChild(s);
+    });
+  }
+
+  function setSize(btn) {
+    state.w = +btn.dataset.w; state.h = +btn.dataset.h;
+    document.querySelectorAll('#sizes .pill').forEach(b => b.classList.toggle('active', b === btn));
+    buildPresets(); render(); fitCanvas();
+  }
+
+  function syncUI() {
+    const leaves = countLeaves(state.tree);
+    document.getElementById('stage-meta').textContent = `${state.w} × ${state.h} · ${leaves} ${leaves === 1 ? 'celda' : 'celdas'}`;
+    document.getElementById('complexity-value').textContent = state.complexity;
+    document.getElementById('complexity-hint').textContent = ['', 'Simple', 'Media', 'Media', 'Alta', 'Muy alta'][state.complexity];
+    const id = state.sel ?? state.tree.id;
+    const hit = find(state.tree, id);
+    const r = rectOf(id);
+    const isLeaf = hit && !hit.node.dir;
+    document.getElementById('sel-hint').textContent = !state.sel || id === state.tree.id
+      ? (state.tree.dir ? 'Selecciona una celda' : 'Formato completo')
+      : state.multi.length ? `${selected().length} celdas · divide la última` : `Celda ${Math.round(r.w)} × ${Math.round(r.h)}`;
+    document.querySelectorAll('#ops .tile').forEach(t => {
+      const op = OPS[+t.dataset.i];
+      t.disabled = !isLeaf || !canSplit(id, op.dir, op.n);
+    });
+    document.getElementById('btn-merge').disabled = !(state.sel && hit && hit.parent);
+    document.getElementById('btn-undo').disabled = !history.length;
+    const cells = selected();
+    const shown = cells.length ? (cells.every(n => n.fill === cells[0].fill) ? cells[0].fill : undefined) : state.brush;
+    document.querySelectorAll('#paint-swatches .swatch').forEach(s => s.classList.toggle('active', shown !== undefined && s.dataset.color === (shown ?? '')));
+    document.getElementById('paint-hint').textContent = cells.length > 1 ? `${cells.length} celdas`
+      : shown === undefined ? 'Varios' : `${colorName(shown)}${shown ? ' ' + shown : ''}`;
+    document.getElementById('btn-brush').classList.toggle('active', state.brushOn);
+    syncShapeUI();
+  }
+
+  // Ajusta la obra al escenario (el SVG escala por su viewBox)
+  function fitCanvas() {
+    const stage = document.getElementById('stage');
+    const svg = document.getElementById('artwork');
+    const mobile = window.matchMedia('(max-width: 820px)').matches;
+    const padX = mobile ? 32 : 120, padY = mobile ? 56 : 160;
+    const k = Math.min((stage.clientWidth - padX) / state.w, (stage.clientHeight - padY) / state.h, 1);
+    svg.style.width = `${Math.max(0, state.w * k)}px`;
+    svg.style.height = `${Math.max(0, state.h * k)}px`;
+    if (k > 0 && Math.abs(k - viewScale) > 0.001) { viewScale = k; render(); }
+  }
+
+  // Clic fuera de la obra = deseleccionar
+  document.getElementById('stage').addEventListener('click', e => { if (e.target.id === 'stage') { state.sel = null; state.multi = []; render(); } });
+
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input[type="text"]')) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const i = ['1', '2', '3', '4'].indexOf(e.key);
+    if (i >= 0 && state.step === 'reticula') { split(OPS[i].dir, OPS[i].n); return; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); merge(); }
+    if (e.key === 'Escape') { state.sel = null; state.multi = []; state.brushOn = false; render(); }
+    if (e.key.toLowerCase() === 'b' && state.step === 'reticula') toggleBrush();
+  });
+
+  // ── Export ─────────────────────────────────────────────────────
+  function artworkString(snap = false) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('xmlns', SVG_NS);
+    svg.setAttribute('width', state.w); svg.setAttribute('height', state.h);
+    draw(svg, state.tree, state.w, state.h, { bg: state.bg, snap });
+    return new XMLSerializer().serializeToString(svg);
+  }
+
+  const fileName = ext => `vincula360-reticula-${state.w}x${state.h}.${ext}`;
+
+  function exportSVG() {
+    deliver(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + artworkString()], { type: 'image/svg+xml' }), fileName('svg'));
+  }
+
+  function exportPNG() {
+    const url = URL.createObjectURL(new Blob([artworkString(true)], { type: 'image/svg+xml;charset=utf-8' }));
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = state.w; canvas.height = state.h;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => deliver(blob, fileName('png')), 'image/png');
+    };
+    img.src = url;
+  }
+
+  // En móvil, pasa el archivo a la hoja de compartir; si no, descarga normal
+  async function deliver(blob, filename) {
+    const file = new File([blob], filename, { type: blob.type });
+    const touch = window.matchMedia('(pointer: coarse)').matches;
+    if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────
+  buildOps();
+  buildSwatches();
+  buildShapeUI();
+  buildPresets();
+  generate(); history.length = 0;
+  render();
+  new ResizeObserver(fitCanvas).observe(document.getElementById('stage'));
+  fitCanvas();
+</script>
+</body>
+</html>
