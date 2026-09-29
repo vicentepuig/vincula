@@ -294,6 +294,12 @@
     .paint-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 12px; }
     #artwork.brush .cell, #artwork.dots .cell.on { cursor: crosshair; }
     .step { display: contents; }
+    #steps { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    #steps .pill { padding: 0 14px; }
+    .tile-grid.logos { grid-template-columns: 1fr 1fr; }
+    .tile-grid.logos .tile { aspect-ratio: 2.2; }
+    .tile-grid.logos .tile .thumb { left: 12%; top: 18%; width: 76%; height: 50%; }
+    .tile-grid.logos .tile .thumb svg { width: 100%; height: 100%; }
     .step.off { display: none; }
     #steps .pill span:first-child { font-weight: 600; }
     .tile-grid.shapes .tile .thumb { left: 20%; top: 14%; width: 60%; height: 60%; }
@@ -335,8 +341,9 @@
   <section class="controls">
 
     <div class="segmented" id="steps">
-      <button class="pill pill-light active" data-step="reticula" onclick="setStep('reticula')"><span>Retícula</span><span>Paso 1</span></button>
-      <button class="pill pill-light" data-step="formas" onclick="setStep('formas')"><span>Formas</span><span>Paso 2</span></button>
+      <button class="pill pill-light active" data-step="reticula" onclick="setStep('reticula')"><span>Retícula</span><span>1</span></button>
+      <button class="pill pill-light" data-step="formas" onclick="setStep('formas')"><span>Formas</span><span>2</span></button>
+      <button class="pill pill-light" data-step="logo" onclick="setStep('logo')"><span>Logo</span><span>3</span></button>
     </div>
 
     <div class="step" data-step="reticula">
@@ -401,6 +408,44 @@
         <span class="section-hint">Del manual</span>
       </div>
       <div class="tile-grid presets" id="presets"></div>
+    </div>
+
+    </div>
+
+    <!-- PASO 3: LOGO — 400 px de ancho, a 35 px del borde -->
+    <div class="step off" data-step="logo">
+
+    <div>
+      <div class="section-head">
+        <span class="section-label">Logo</span>
+        <span class="section-hint" id="logo-hint"></span>
+      </div>
+      <div class="segmented" id="logo-on">
+        <button class="pill pill-light" data-on="1" onclick="setLogo({ on: true })"><span>Con logo</span></button>
+        <button class="pill pill-light" data-on="0" onclick="setLogo({ on: false })"><span>Sin logo</span></button>
+      </div>
+    </div>
+
+    <div id="logo-controls">
+      <div class="section-head"><span class="section-label">Posición</span></div>
+      <div class="segmented" id="logo-pos">
+        <button class="pill pill-light" data-pos="top" onclick="setLogo({ pos: 'top' })"><span>Superior</span><span>3 abajo</span></button>
+        <button class="pill pill-light" data-pos="bottom" onclick="setLogo({ pos: 'bottom' })"><span>Inferior</span><span>3 arriba</span></button>
+      </div>
+      <div class="segmented stack-top" id="logo-side">
+        <button class="pill pill-light" data-side="left" onclick="setLogo({ side: 'left' })"><span>Izquierda</span></button>
+        <button class="pill pill-light" data-side="right" onclick="setLogo({ side: 'right' })"><span>Derecha</span></button>
+      </div>
+
+      <div class="sub-label"><span>Versión</span></div>
+      <div class="tile-grid logos" id="logo-versions"></div>
+
+      <div class="sub-label"><span>Color</span><span id="logo-color-name"></span></div>
+      <div class="swatches" id="logo-colors">
+        <button class="swatch" style="background:#161616" data-color="#161616" title="Negro #161616" onclick="setLogo({ color: '#161616' })"></button>
+        <button class="swatch" style="background:#FFFFFF" data-color="#FFFFFF" title="Blanco #FFFFFF" onclick="setLogo({ color: '#FFFFFF' })"></button>
+      </div>
+      <p class="paint-hint">Margen invisible de <b>35 px</b> desde el borde. El logo mide 400 px de ancho y solo se reduce si el módulo donde cae es más angosto.</p>
     </div>
 
     </div>
@@ -529,8 +574,15 @@
   ];
   const INNERS = [{ v: 0, t: 'Ninguno' }, { v: 6 / 8, t: '6/8' }, { v: 4 / 8, t: '4/8' }, { v: 2 / 8, t: '2/8' }];
 
+  // Logotipos Vincula360 (paths de 1. Logotipos/SVG). pos 'top' usa el 3 hacia abajo; 'bottom', el 3 hacia arriba.
+  const LOGOS = {"full_down":{"w":1575.0,"h":345.0,"d":["M112.401 223.552H56.0633L0 58.8441H47.5439L85.6065 183.905L123.669 58.8441H168.602L112.539 223.552H112.401Z","M200.481 0C214.909 0 226.589 11.268 226.589 25.04C226.589 38.8121 214.772 50.0801 200.481 50.0801C186.191 50.0801 174.373 38.8121 174.373 25.04C174.373 11.268 186.191 0 200.481 0ZM223.291 223.552H177.534V60.9308H223.291V223.413V223.552Z","M238.132 57.7311H280.179V97.3779H281.691C281.691 97.3779 283.202 92.509 283.339 92.2307C284.988 87.9183 286.912 83.8841 289.111 79.8498C295.706 68.5818 305.05 59.2614 317.417 55.3662C344.35 47.1587 373.206 59.8178 383.511 86.8054C387.634 97.7952 389.008 109.759 389.008 121.444V223.413H345.449V131.043C345.449 102.386 337.616 89.5876 317.417 89.5876C294.057 89.5876 281.553 103.916 281.553 137.442V223.552H237.994V57.7311H238.132Z","M731.983 224.526H689.936V184.879H688.424C688.424 184.879 686.913 189.748 686.775 190.026C685.126 194.338 683.203 198.373 681.004 202.407C674.408 213.675 665.065 222.995 652.698 226.891C625.765 235.098 596.909 222.439 586.603 195.451C582.481 184.462 581.107 172.498 581.107 160.813V58.8441H624.666V151.214C624.666 179.871 632.498 192.669 652.698 192.669C676.057 192.669 688.562 178.341 688.562 144.815V58.705H732.121V224.387L731.983 224.526Z","M487.393 53.0015C558.847 53.0015 563.519 118.801 563.519 118.801H520.097C520.097 118.801 518.585 86.6664 487.531 86.6664C459.911 86.6664 450.293 111.011 450.293 141.198C450.293 171.385 459.911 195.73 487.531 195.73C518.585 195.73 520.097 163.595 520.097 163.595H563.519C563.519 163.595 558.847 229.395 487.393 229.395C434.628 229.395 406.596 189.887 406.596 141.198C406.596 92.5091 434.491 53.0015 487.393 53.0015Z","M865.683 223.552H743.663V58.8441H786.947V188.774H865.683V223.552Z","M882.035 109.063C884.646 66.3561 918.586 52.8623 956.786 52.8623C994.986 52.8623 1028.38 67.3299 1028.38 110.593V224.526H983.856V192.391H982.207C982.207 192.391 972.039 229.255 929.716 229.255C899.486 229.255 877.226 215.066 877.226 184.322C877.226 153.579 902.647 139.111 929.991 132.017C957.611 124.922 983.718 122.696 983.718 104.055C983.718 90.9788 974.237 83.1886 956.649 83.1886C937.549 83.1886 927.106 90.8397 926.418 108.924H881.898L882.035 109.063ZM948.816 153.996C934.526 157.474 922.434 164.847 922.434 179.732C922.434 192.53 931.365 200.599 945.656 200.599C955.412 200.599 962.695 196.982 968.329 191.278C980.146 179.175 983.856 157.474 983.856 140.642C976.573 147.319 961.595 150.936 948.954 154.135L948.816 153.996Z","M1090.07 267.094C1090.07 292.273 1101.2 311.053 1129.51 311.053C1151.36 311.053 1164.28 296.863 1164.28 276.553C1164.28 253.043 1151.63 242.054 1124.84 242.054H1106.15V207.554H1124.84C1148.47 207.554 1159.6 196.564 1159.6 177.645C1159.6 161.926 1150.12 147.875 1126.49 147.875C1101.2 147.875 1093.37 165.125 1093.37 184.044H1052.29C1052.29 147.875 1072.9 114.906 1126.49 114.906C1180.08 114.906 1202.34 143.145 1202.34 174.585C1202.34 212.284 1172.38 221.743 1172.38 221.743V223.274C1172.38 223.274 1208.66 231.064 1208.66 275.162C1208.66 311.331 1183.38 344.3 1129.65 344.3C1069.6 344.3 1045.97 308.131 1045.97 267.372H1090.21L1090.07 267.094Z","M1343.6 61.209C1340.57 47.437 1334.25 32.9694 1312.68 32.9694C1277.64 32.9694 1269.26 70.6685 1267.75 102.108H1269.26C1269.26 102.108 1283.14 80.1281 1318.86 80.1281C1357.61 80.1281 1388.53 106.837 1388.53 150.797C1388.53 194.756 1359.12 229.395 1311.03 229.395C1255.24 229.395 1225.83 191.695 1225.83 122.557C1225.83 42.4289 1258.4 0 1312.54 0C1352.8 0 1379.18 21.9796 1383.86 61.3481H1343.6V61.209ZM1307.87 196.425C1328.34 196.425 1345.11 182.236 1345.11 153.996C1345.11 125.757 1328.34 111.567 1307.87 111.567C1287.39 111.567 1270.63 125.757 1270.63 153.996C1270.63 179.732 1287.39 196.425 1307.87 196.425Z","M1574.31 106.977C1570.18 37.2818 1538.31 0.417334 1487.6 0C1436.48 0 1404.47 36.7254 1400.35 106.698C1400.35 106.698 1400.21 111.985 1400.35 114.628C1400.35 117.271 1400.35 122.279 1400.35 122.279C1404.47 191.974 1436.35 228.838 1487.05 229.116C1538.17 229.116 1570.18 192.391 1574.31 122.418C1574.31 122.418 1574.58 117.271 1574.44 114.628C1574.44 111.985 1574.31 106.837 1574.31 106.837V106.977ZM1532.4 127.148C1530.89 158.448 1522.5 195.869 1487.46 196.286C1452.01 196.286 1443.63 158.448 1441.98 127.009C1441.98 127.009 1441.57 120.888 1441.57 114.628C1441.57 108.368 1441.98 102.108 1441.98 102.108C1443.49 70.8077 1451.87 33.3867 1486.91 32.9694C1522.37 32.9694 1530.75 70.8077 1532.4 102.247C1532.4 102.247 1532.67 108.507 1532.67 114.628C1532.67 120.749 1532.4 127.009 1532.4 127.009V127.148Z"]},"full_up":{"w":1575.0,"h":340.0,"d":["M112.399 333.898H56.0619L0 171.208H47.5427L85.6044 294.737L123.666 171.208H168.598L112.536 333.898H112.399Z","M200.475 113.086C214.903 113.086 226.583 124.216 226.583 137.819C226.583 151.422 214.766 162.552 200.475 162.552C186.185 162.552 174.368 151.422 174.368 137.819C174.368 124.216 186.185 113.086 200.475 113.086ZM223.285 333.898H177.529V173.407H223.285V333.898Z","M238.125 170.247H280.171V209.408H281.683C281.683 209.408 283.194 204.599 283.332 204.324C284.981 200.064 286.904 196.079 289.103 192.095C295.698 180.965 305.042 171.758 317.409 167.911C344.34 159.804 373.196 172.308 383.501 198.965C387.623 209.82 388.998 221.637 388.998 233.179V333.898H345.44V242.66C345.44 214.354 337.607 201.713 317.409 201.713C294.049 201.713 281.545 215.866 281.545 248.981V334.036H237.988V170.384L238.125 170.247Z","M731.966 334.997H689.92V295.836H688.408C688.408 295.836 686.897 300.645 686.759 300.92C685.111 305.18 683.187 309.165 680.988 313.149C674.393 324.279 665.049 333.486 652.683 337.333C625.751 345.44 596.895 332.936 586.59 306.279C582.468 295.424 581.094 283.607 581.094 272.065V171.346H624.652V262.584C624.652 290.889 632.484 303.531 652.683 303.531C676.042 303.531 688.546 289.378 688.546 256.263V171.208H732.104V334.86L731.966 334.997Z","M487.382 165.438C558.833 165.438 563.505 230.431 563.505 230.431H520.084C520.084 230.431 518.573 198.69 487.519 198.69C459.9 198.69 450.282 222.736 450.282 252.553C450.282 282.371 459.9 306.417 487.519 306.417C518.573 306.417 520.084 274.676 520.084 274.676H563.505C563.505 274.676 558.833 339.669 487.382 339.669C434.617 339.669 406.586 300.646 406.586 252.553C406.586 204.461 434.48 165.438 487.382 165.438Z","M865.662 333.898H743.645V171.208H786.928V299.546H865.662V333.898Z","M882.013 220.95C884.624 178.766 918.563 165.438 956.762 165.438C994.961 165.438 1028.35 179.728 1028.35 222.461V334.997H983.831V303.256H982.183C982.183 303.256 972.015 339.669 929.693 339.669C899.464 339.669 877.204 325.654 877.204 295.287C877.204 264.92 902.624 250.63 929.968 243.622C957.587 236.614 983.694 234.416 983.694 216.003C983.694 203.087 974.213 195.392 956.625 195.392C937.525 195.392 927.082 202.95 926.395 220.812H881.876L882.013 220.95ZM948.793 265.195C934.502 268.63 922.411 275.913 922.411 290.615C922.411 303.256 931.342 311.226 945.632 311.226C955.388 311.226 962.671 307.653 968.305 302.02C980.121 290.065 983.831 268.63 983.831 252.004C976.549 258.599 961.572 262.172 948.93 265.332L948.793 265.195Z","M1090.05 150.323C1090.05 175.194 1101.18 193.743 1129.48 193.743C1151.33 193.743 1164.25 179.728 1164.25 159.667C1164.25 136.445 1151.61 125.59 1124.81 125.59H1106.12V91.5129H1124.81C1148.45 91.5129 1159.58 80.6577 1159.58 61.9704C1159.58 46.4435 1150.09 32.5654 1126.46 32.5654C1101.18 32.5654 1093.34 49.6038 1093.34 68.2911H1052.26C1052.26 32.5654 1072.87 0 1126.46 0C1180.05 0 1202.31 27.8936 1202.31 58.9475C1202.31 96.1847 1172.35 105.528 1172.35 105.528V107.04C1172.35 107.04 1208.63 114.735 1208.63 158.293C1208.63 194.018 1183.35 226.584 1129.62 226.584C1069.57 226.584 1045.94 190.858 1045.94 150.598H1090.18L1090.05 150.323Z","M1343.56 173.682C1340.54 160.079 1334.22 145.789 1312.65 145.789C1277.61 145.789 1269.23 183.026 1267.71 214.08H1269.23C1269.23 214.08 1283.1 192.37 1318.83 192.37C1357.58 192.37 1388.49 218.752 1388.49 262.172C1388.49 305.593 1359.09 339.807 1311 339.807C1255.21 339.807 1225.8 302.57 1225.8 234.279C1225.8 155.132 1258.37 113.223 1312.51 113.223C1352.77 113.223 1379.15 134.934 1383.82 173.82H1343.56V173.682ZM1307.84 307.104C1328.31 307.104 1345.07 293.089 1345.07 265.195C1345.07 237.302 1328.31 223.286 1307.84 223.286C1287.36 223.286 1270.6 237.302 1270.6 265.195C1270.6 290.615 1287.36 307.104 1307.84 307.104Z","M1574.27 218.752C1570.15 149.911 1538.27 113.498 1487.56 113.223C1436.45 113.223 1404.43 149.499 1400.31 218.614C1400.31 218.614 1400.17 223.836 1400.31 226.446C1400.31 229.057 1400.31 234.004 1400.31 234.004C1404.43 302.845 1436.31 339.257 1487.02 339.532C1538.13 339.532 1570.15 303.257 1574.27 234.141C1574.27 234.141 1574.54 229.057 1574.41 226.446C1574.41 223.836 1574.27 218.752 1574.27 218.752ZM1532.36 238.813C1530.85 269.73 1522.47 306.692 1487.43 307.104C1451.98 307.104 1443.59 269.729 1441.95 238.676C1441.95 238.676 1441.53 232.63 1441.53 226.446C1441.53 220.263 1441.95 214.08 1441.95 214.08C1443.46 183.163 1451.84 146.201 1486.88 145.789C1522.33 145.789 1530.71 183.163 1532.36 214.217C1532.36 214.217 1532.63 220.4 1532.63 226.446C1532.63 232.492 1532.36 238.676 1532.36 238.676V238.813Z"]},"short_down":{"w":685.0,"h":345.0,"d":["M112.401 223.552H56.0633L0 58.8445H47.5439L85.6064 183.906L123.669 58.8445H168.602L112.539 223.552H112.401Z","M200.575 267.093C200.575 292.272 211.705 311.052 240.012 311.052C261.86 311.052 274.776 296.863 274.776 276.553C274.776 253.043 262.135 242.053 235.34 242.053H216.652V207.554H235.34C258.974 207.554 270.104 196.564 270.104 177.645C270.104 161.925 260.623 147.875 236.989 147.875C211.705 147.875 203.873 165.125 203.873 184.044H162.787C162.787 147.875 183.399 114.906 236.989 114.906C290.579 114.906 312.839 143.145 312.839 174.584C312.839 212.283 282.883 221.743 282.883 221.743V223.273C282.883 223.273 319.16 231.063 319.16 275.162C319.16 311.331 293.876 344.3 240.149 344.3C180.101 344.3 156.466 308.131 156.466 267.371H200.712L200.575 267.093Z","M454.096 61.209C451.073 47.437 444.752 32.9694 423.179 32.9694C388.14 32.9694 379.758 70.6685 378.246 102.108H379.758C379.758 102.108 393.636 80.1281 429.363 80.1281C468.112 80.1281 499.029 106.837 499.029 150.797C499.029 194.756 469.624 229.395 421.53 229.395C365.742 229.395 336.336 191.695 336.336 122.557C336.336 42.4289 368.902 0 423.042 0C463.303 0 489.686 21.9796 494.357 61.3481H454.096V61.209ZM418.37 196.425C438.844 196.425 455.608 182.236 455.608 153.996C455.608 125.757 438.844 111.567 418.37 111.567C397.896 111.567 381.132 125.757 381.132 153.996C381.132 179.732 397.896 196.425 418.37 196.425Z","M684.807 106.977C680.685 37.2818 648.806 0.417334 598.102 0C546.985 0 514.969 36.7254 510.846 106.698C510.846 106.698 510.709 111.985 510.846 114.628C510.846 117.271 510.846 122.279 510.846 122.279C514.969 191.974 546.848 228.838 597.552 229.116C648.668 229.116 680.685 192.391 684.807 122.418C684.807 122.418 685.082 117.271 684.945 114.628C684.945 111.985 684.807 106.837 684.807 106.837V106.977ZM642.897 127.148C641.386 158.448 633.004 195.869 597.964 196.286C562.512 196.286 554.13 158.448 552.481 127.009C552.481 127.009 552.069 120.888 552.069 114.628C552.069 108.368 552.481 102.108 552.481 102.108C553.993 70.8077 562.375 33.3867 597.414 32.9694C632.866 32.9694 641.248 70.8077 642.897 102.247C642.897 102.247 643.172 108.507 643.172 114.628C643.172 120.749 642.897 127.009 642.897 127.009V127.148Z"]},"short_up":{"w":724.0,"h":345.0,"d":["M112.401 338.227H56.0633L0 173.519H47.5439L85.6064 298.58L123.669 173.519H168.602L112.539 338.227H112.401Z","M239.364 152.188C239.364 177.367 250.495 196.147 278.801 196.147C300.649 196.147 313.566 181.958 313.566 161.647C313.566 138.138 300.924 127.148 274.129 127.148H255.441V92.6481H274.129C297.764 92.6481 308.894 81.6583 308.894 62.7392C308.894 47.0196 299.413 32.9694 275.778 32.9694C250.495 32.9694 242.662 50.2192 242.662 69.1383H201.577C201.577 32.9694 222.188 0 275.778 0C329.368 0 351.628 28.2396 351.628 59.6787C351.628 97.3779 321.673 106.837 321.673 106.837V108.368C321.673 108.368 357.949 116.158 357.949 160.256C357.949 196.425 332.666 229.395 278.939 229.395C218.89 229.395 195.256 193.226 195.256 152.466H239.502L239.364 152.188Z","M492.886 175.883C489.863 162.111 483.542 147.643 461.969 147.643C426.929 147.643 418.547 185.343 417.036 216.782H418.547C418.547 216.782 432.426 194.802 468.152 194.802C506.902 194.802 537.819 221.512 537.819 265.471C537.819 309.43 508.413 344.069 460.32 344.069C404.531 344.069 375.125 306.369 375.125 237.231C375.125 157.103 407.692 114.674 461.831 114.674C502.092 114.674 528.475 136.654 533.147 176.022H492.886V175.883ZM457.159 311.099C477.633 311.099 494.397 296.91 494.397 268.67C494.397 240.431 477.633 226.241 457.159 226.241C436.685 226.241 419.921 240.431 419.921 268.67C419.921 294.406 436.685 311.099 457.159 311.099Z","M723.597 221.651C719.475 151.956 687.595 115.091 636.891 114.674C585.775 114.674 553.758 151.399 549.636 221.372C549.636 221.372 549.498 226.659 549.636 229.302C549.636 231.945 549.636 236.953 549.636 236.953C553.758 306.648 585.637 343.512 636.341 343.79C687.458 343.79 719.475 307.065 723.597 237.092C723.597 237.092 723.872 231.945 723.734 229.302C723.734 226.659 723.597 221.512 723.597 221.512V221.651ZM681.687 241.822C680.175 273.122 671.793 310.543 636.754 310.96C601.302 310.96 592.92 273.122 591.271 241.683C591.271 241.683 590.859 235.562 590.859 229.302C590.859 223.042 591.271 216.782 591.271 216.782C592.783 185.482 601.164 148.061 636.204 147.643C671.656 147.643 680.038 185.482 681.687 216.921C681.687 216.921 681.962 223.181 681.962 229.302C681.962 235.423 681.687 241.683 681.687 241.683V241.822Z"]}};
+  const LOGO_WIDTH = 400, LOGO_MARGIN = 35;
+  const LOGO_SCALE = LOGO_WIDTH / LOGOS.full_down.w;   // misma escala para completo y resumido
+  const logoKey = l => `${l.version}_${l.pos === 'top' ? 'down' : 'up'}`;
+
   const state = {
     step: 'reticula',
+    logo: { on: true, pos: 'bottom', side: 'left', version: 'full', color: '#161616' },
     tree: L(),
     sel: null,          // id de la celda seleccionada (principal)
     multi: [],          // otras celdas seleccionadas con ⇧
@@ -574,7 +626,7 @@
     return [...state.multi, state.sel].filter((id, i, a) => id != null && a.indexOf(id) === i)
       .map(id => find(state.tree, id)?.node).filter(n => n && !n.dir);
   }
-  function snapshot() { history.push(JSON.stringify({ tree: state.tree, sel: state.sel, multi: state.multi })); if (history.length > 80) history.shift(); }
+  function snapshot() { history.push(JSON.stringify({ tree: state.tree, sel: state.sel, multi: state.multi, logo: state.logo })); if (history.length > 80) history.shift(); }
 
   // ── Dibujo ─────────────────────────────────────────────────────
   // Dibuja la retícula (fondo + líneas) en un <svg>. ui = añade celdas clicables y selección.
@@ -614,6 +666,8 @@
       }
       svg.appendChild(g);
     });
+    if (opts.logo) drawLogo(svg, tree, W, H, opts.logo);
+
     // Las líneas son solo una guía en pantalla: no se exportan
     if (!opts.guides) return;
     const sw = opts.stroke ?? 1;
@@ -651,7 +705,7 @@
     svg.setAttribute('width', state.w); svg.setAttribute('height', state.h);
     svg.classList.toggle('brush', state.brushOn);
     // En pantalla la línea nunca baja de 1px real, aunque el lienzo esté reducido
-    draw(svg, state.tree, state.w, state.h, { bg: state.bg, guides: true, ui: true });
+    draw(svg, state.tree, state.w, state.h, { bg: state.bg, logo: state.logo, guides: true, ui: true });
     syncUI();
   }
 
@@ -749,7 +803,7 @@
   function undo() {
     const prev = history.pop(); if (!prev) return;
     const s = JSON.parse(prev);
-    state.tree = s.tree; state.sel = s.sel; state.multi = s.multi || [];
+    state.tree = s.tree; state.sel = s.sel; state.multi = s.multi || []; if (s.logo) state.logo = s.logo;
     render();
   }
 
@@ -962,6 +1016,62 @@
     render();
   }
 
+  // ── Logo ───────────────────────────────────────────────────────
+  // Módulo de la esquina donde cae el logo; el logo cabe dentro con 35 px de margen
+  function logoLayout(tree, W, H, l) {
+    const lg = LOGOS[logoKey(l)];
+    const px = l.side === 'left' ? 1 : W - 1, py = l.pos === 'top' ? 1 : H - 1;
+    let cell = { x: 0, y: 0, w: W, h: H };
+    walk(tree, 0, 0, W, H, (n, r) => { if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) cell = r; });
+    const k = Math.max(0, Math.min(LOGO_SCALE, (cell.w - LOGO_MARGIN * 2) / lg.w, (cell.h - LOGO_MARGIN * 2) / lg.h));
+    const w = lg.w * k, h = lg.h * k;
+    const x = l.side === 'left' ? cell.x + LOGO_MARGIN : cell.x + cell.w - LOGO_MARGIN - w;
+    const y = l.pos === 'top' ? cell.y + LOGO_MARGIN : cell.y + cell.h - LOGO_MARGIN - h;
+    return { lg, k, w, h, x, y };
+  }
+
+  function drawLogo(svg, tree, W, H, l) {
+    if (!l.on) return;
+    const { lg, k, x, y } = logoLayout(tree, W, H, l);
+    if (!k) return;
+    const g = el('g', { fill: l.color, transform: `translate(${+x.toFixed(3)} ${+y.toFixed(3)}) scale(${+k.toFixed(6)})` });
+    lg.d.forEach(d => g.appendChild(el('path', { d })));
+    svg.appendChild(g);
+  }
+
+  function setLogo(patch) { snapshot(); Object.assign(state.logo, patch); render(); }
+
+  function buildLogoUI() {
+    const box = document.getElementById('logo-versions');
+    [['full', 'Completo'], ['short', 'Resumido']].forEach(([v, label]) => {
+      const t = document.createElement('button');
+      t.className = 'tile'; t.dataset.version = v;
+      t.innerHTML = `<span class="thumb"></span><span class="tile-label">${label}</span>`;
+      t.onclick = () => setLogo({ version: v });
+      box.appendChild(t);
+    });
+  }
+
+  function syncLogoUI() {
+    const l = state.logo;
+    const act = (sel, attr, val) => document.querySelectorAll(sel).forEach(b => b.classList.toggle('active', b.dataset[attr] === String(val)));
+    act('#logo-on .pill', 'on', l.on ? 1 : 0);
+    act('#logo-pos .pill', 'pos', l.pos);
+    act('#logo-side .pill', 'side', l.side);
+    act('#logo-versions .tile', 'version', l.version);
+    act('#logo-colors .swatch', 'color', l.color);
+    document.getElementById('logo-controls').classList.toggle('is-disabled', !l.on);
+    document.getElementById('logo-color-name').textContent = l.color === '#FFFFFF' ? 'Blanco #FFFFFF' : 'Negro #161616';
+    // miniaturas según la posición (3 abajo / 3 arriba)
+    document.querySelectorAll('#logo-versions .tile').forEach(t => {
+      const lg = LOGOS[logoKey({ ...l, version: t.dataset.version })];
+      t.querySelector('.thumb').innerHTML = `<svg viewBox="0 0 ${lg.w} ${lg.h}" fill="#000">${lg.d.map(d => `<path d="${d}"/>`).join('')}</svg>`;
+    });
+    const { w, h, k } = logoLayout(state.tree, state.w, state.h, l);
+    document.getElementById('logo-hint').textContent = !l.on ? '' : !k ? 'No cabe en el módulo'
+      : `${+w.toFixed(2)} × ${+h.toFixed(2)} px${k < LOGO_SCALE - 1e-9 ? ' · reducido' : ''}`;
+  }
+
   // ── UI ─────────────────────────────────────────────────────────
   function buildShapeUI() {
     const grid = document.getElementById('shape-types');
@@ -1107,6 +1217,7 @@
       : shown === undefined ? 'Varios' : `${colorName(shown)}${shown ? ' ' + shown : ''}`;
     document.getElementById('btn-brush').classList.toggle('active', state.brushOn);
     syncShapeUI();
+    syncLogoUI();
   }
 
   // Ajusta la obra al escenario (el SVG escala por su viewBox)
@@ -1140,7 +1251,7 @@
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('xmlns', SVG_NS);
     svg.setAttribute('width', state.w); svg.setAttribute('height', state.h);
-    draw(svg, state.tree, state.w, state.h, { bg: state.bg, snap });
+    draw(svg, state.tree, state.w, state.h, { bg: state.bg, logo: state.logo, snap });
     return new XMLSerializer().serializeToString(svg);
   }
 
@@ -1181,6 +1292,7 @@
   buildOps();
   buildSwatches();
   buildShapeUI();
+  buildLogoUI();
   buildPresets();
   generate(); history.length = 0;
   render();
